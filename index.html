@@ -40,7 +40,7 @@ footer{padding:28px 0;color:var(--mut);font-size:.9rem}
    La clé « publiable » (sb_publishable_...) peut être publique : la sécurité vient des policies RLS.
    N'utilisez JAMAIS la clé secrète / service_role dans ce fichier. */
 const SUPABASE_URL = 'https://fhvhygtrwalnbmplhvqv.supabase.co';
-const SUPABASE_KEY = 'COLLE_ICI_TA_CLE_PUBLIABLE';
+const SUPABASE_KEY = 'sb_publishable_rVaeSfhXt4uvyhBzEF9psA_FOiBZ_jF';
 const CONFIG_OK = !SUPABASE_KEY.startsWith('COLLE');
 const sb = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
