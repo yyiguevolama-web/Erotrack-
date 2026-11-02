@@ -41,6 +41,7 @@ footer{padding:28px 0;color:var(--mut);font-size:.9rem}
    N'utilisez JAMAIS la clé secrète / service_role dans ce fichier. */
 const SUPABASE_URL = 'https://fhvhygtrwalnbmplhvqv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_rVaeSfhXt4uvyhBzEF9psA_FOiBZ_jF';
+const RECOVERY_URL = /type=recovery/.test(location.hash), LINK_ERR = /error_code=|error_description=/.test(location.hash);
 const CONFIG_OK = !SUPABASE_KEY.startsWith('COLLE');
 const sb = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
@@ -49,12 +50,12 @@ const $ = s => document.querySelector(s), app = $('#app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const msg = (el, t, ok) => { el.innerHTML = `<p class="msg ${ok ? 'ok' : 'ko'}" role="status">${esc(t)}</p>`; };
 const go = h => { location.hash = h; };
-const ERR = { 'Invalid login credentials': 'E-mail ou mot de passe incorrect.', 'Email not confirmed': 'Confirmez d’abord votre e-mail (lien reçu par courriel).', 'User already registered': 'Un compte existe déjà avec cet e-mail.' };
+const ERR = { 'Invalid login credentials': 'E-mail ou mot de passe incorrect.', 'Email not confirmed': 'Confirmez d’abord votre e-mail (lien reçu par courriel).', 'User already registered': 'Un compte existe déjà avec cet e-mail.', 'New password should be different from the old password.': 'Choisissez un mot de passe différent de l’ancien.', 'Auth session missing!': 'Session expirée : redemandez un lien de réinitialisation.' };
 const tr = m => ERR[m] || m;
 const STAT = { en_attente: ['En attente de validation', '#b8892f'], valide: ['Validé', '#2e7d4f'], refuse: ['Refusé', '#c0392b'] };
 const tag = s => `<span class="tag" style="background:${(STAT[s] || STAT.en_attente)[1]}">${(STAT[s] || STAT.en_attente)[0]}</span>`;
 const SECT = ['Tabou', 'Grand-Béréby', 'San-Pédro', 'Sassandra', 'Fresco', 'Grand-Lahou', 'Jacqueville', 'Abidjan', 'Grand-Bassam', 'Bonoua', 'Assinie', 'Adiaké'];
-let user = null, prof = null, isAdm = false;
+let user = null, prof = null, isAdm = false, recovery = RECOVERY_URL, linkErrShown = false;
 
 /* ===== Session ===== */
 async function load() {
@@ -85,7 +86,7 @@ function accueil() {
 
 function connexion() {
   if (user) return go('#compte');
-  app.innerHTML = `<section><h1>Connexion</h1>${alerteConfig()}<form class="card" id="f"><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><label for="p">Mot de passe</label><input id="p" type="password" autocomplete="current-password" required><p><button class="btn" type="submit">Se connecter</button></p><div id="m"></div><p class="note">Pas encore de compte ? <a href="#inscription">Créer un compte</a></p></form></section>`;
+  app.innerHTML = `<section><h1>Connexion</h1>${alerteConfig()}<form class="card" id="f"><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><label for="p">Mot de passe</label><input id="p" type="password" autocomplete="current-password" required><p style="margin:6px 0 0"><a href="#mot-de-passe-oublie">Mot de passe oublié ?</a></p><p><button class="btn" type="submit">Se connecter</button></p><div id="m"></div><p class="note">Pas encore de compte ? <a href="#inscription">Créer un compte</a></p></form></section>`;
   $('#f').onsubmit = async e => {
     e.preventDefault(); if (!sb) return;
     const { error } = await sb.auth.signInWithPassword({ email: $('#e').value.trim(), password: $('#p').value });
@@ -137,13 +138,49 @@ async function admin() {
   });
 }
 
-const PAGES = { accueil, connexion, inscription, compte, admin };
+function oublie() {
+  if (user && !recovery) return go('#compte');
+  app.innerHTML = `<section><h1>Mot de passe oublié</h1>${alerteConfig()}${LINK_ERR ? '<p class="msg ko">Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau ci-dessous.</p>' : ''}<form class="card" id="f"><p>Saisissez l’adresse e-mail de votre compte : nous vous enverrons un lien pour choisir un nouveau mot de passe.</p><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><p><button class="btn" type="submit">Envoyer le lien</button></p><div id="m"></div><p class="note"><a href="#connexion">← Retour à la connexion</a></p></form></section>`;
+  $('#f').onsubmit = async e => {
+    e.preventDefault(); if (!sb) return;
+    const b = $('#f').querySelector('button'); b.disabled = true;
+    const { error } = await sb.auth.resetPasswordForEmail($('#e').value.trim(), { redirectTo: location.origin + location.pathname });
+    if (error) {
+      if (/rate|seconds|too many/i.test(error.message)) { msg($('#m'), 'Trop de demandes : patientez une minute avant de redemander un lien.'); setTimeout(() => b.disabled = false, 60000); }
+      else { b.disabled = false; msg($('#m'), tr(error.message)); }
+      return;
+    }
+    msg($('#m'), 'Si un compte existe avec cette adresse, un lien de réinitialisation vient d’être envoyé. Pensez à vérifier vos courriers indésirables.', true);
+    setTimeout(() => b.disabled = false, 60000);
+  };
+}
+
+function reinitialiser() {
+  if (!recovery) return go('#mot-de-passe-oublie');
+  app.innerHTML = `<section><h1>Nouveau mot de passe</h1><form class="card" id="f"><label for="p1">Nouveau mot de passe (8 caractères minimum)</label><input id="p1" type="password" minlength="8" autocomplete="new-password" required><label for="p2">Confirmer le mot de passe</label><input id="p2" type="password" minlength="8" autocomplete="new-password" required><p><button class="btn" type="submit">Enregistrer le mot de passe</button></p><div id="m"></div></form></section>`;
+  $('#f').onsubmit = async e => {
+    e.preventDefault();
+    if ($('#p1').value !== $('#p2').value) return msg($('#m'), 'Les deux mots de passe ne correspondent pas.');
+    recovery = false;
+    const { error } = await sb.auth.updateUser({ password: $('#p1').value });
+    if (error) { recovery = true; return msg($('#m'), tr(error.message)); }
+    msg($('#m'), 'Mot de passe modifié. Vous êtes connecté(e).', true);
+    setTimeout(async () => { await load(); go('#compte'); }, 1200);
+  };
+}
+
+const PAGES = { accueil, connexion, inscription, compte, admin, 'mot-de-passe-oublie': oublie, reinitialiser };
 async function route() {
+  if (recovery && location.hash.slice(1) !== 'reinitialiser') return go('#reinitialiser');
+  if (LINK_ERR && !linkErrShown) { linkErrShown = true; return go('#mot-de-passe-oublie'); }
   nav();
   await (PAGES[location.hash.slice(1)] ?? accueil)();
   window.scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
-if (sb) sb.auth.onAuthStateChange(ev => { if (ev !== 'INITIAL_SESSION') setTimeout(load, 0); });
+if (sb) sb.auth.onAuthStateChange(ev => {
+  if (ev === 'PASSWORD_RECOVERY') { recovery = true; setTimeout(() => { load(); go('#reinitialiser'); }, 0); return; }
+  if (ev !== 'INITIAL_SESSION') setTimeout(load, 0);
+});
 load();
 </script></body></html>
