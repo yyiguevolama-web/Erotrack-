@@ -20,6 +20,11 @@ form.card{max-width:520px}.chk{display:flex;gap:8px;align-items:flex-start;font-
 .msg{margin:12px 0 0;padding:10px 12px;border-radius:8px}.msg.ok{background:#d9f0e0;color:#17492b}.msg.ko{background:#f8dcd8;color:#7a1f14}
 .tag{display:inline-block;padding:2px 10px;border-radius:99px;color:#fff;font-size:.82rem}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.row>div{flex:1;min-width:200px}
 footer{padding:28px 0;color:var(--mut);font-size:.9rem}
+.cmp{position:relative;height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);--p:50%}.cmp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.cmp img.b{clip-path:inset(0 0 0 var(--p))}.cmp::after{content:"";position:absolute;top:0;bottom:0;left:var(--p);width:3px;background:#fff;pointer-events:none}.cmp input{position:absolute;inset:0;height:100%;opacity:0;cursor:ew-resize;padding:0}.lb{position:absolute;top:10px;padding:2px 10px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;font-size:.85rem}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;border-top:1px solid var(--line)}textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+.wide{max-width:760px!important}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.two{grid-template-columns:1fr}}
+#mb{display:none;background:transparent;border:1px solid #9fd0d8;color:#fff;border-radius:8px;padding:6px 14px;font:600 .95rem system-ui,sans-serif;cursor:pointer}
+@media(max-width:900px){#mb{display:block}nav{display:none;width:100%;flex-direction:column;align-items:stretch;gap:4px;padding-bottom:10px}nav.open{display:flex}nav a{padding:12px 14px;background:rgba(255,255,255,.07)}}
 </style></head>
 <body>
 <header><div class="w"><a class="logo" href="#accueil" aria-label="EroTrack, accueil"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="lgc"><circle cx="32" cy="32" r="30"/></clipPath></defs>
@@ -31,9 +36,9 @@ footer{padding:28px 0;color:var(--mut);font-size:.9rem}
 <path d="M8 55Q16 51 24 55T40 55T56 55" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.8" stroke-linecap="round"/></g>
 <circle cx="32" cy="32" r="30" fill="none" stroke="#e9c987" stroke-width="2"/>
 <circle cx="44" cy="38" r="6.5" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.4"/>
-<circle cx="44" cy="38" r="3" fill="#fff" stroke="#08323f" stroke-width="1.4"/></svg><span>Ero<b>Track</b></span></a><nav id="nav" aria-label="Navigation principale"></nav></div></header>
+<circle cx="44" cy="38" r="3" fill="#fff" stroke="#08323f" stroke-width="1.4"/></svg><span>Ero<b>Track</b></span></a><button id="mb" type="button" aria-expanded="false" aria-controls="nav">☰ Menu</button><nav id="nav" aria-label="Navigation principale"></nav></div></header>
 <main id="app" class="w"></main>
-<footer><div class="w">EroTrack : observatoire citoyen et scientifique du littoral ivoirien.</div></footer>
+<footer><div class="w">EroTrack : observatoire citoyen et scientifique du littoral ivoirien.<br><a href="#protocole">Protocole de mesure</a> · <a href="#confidentialite">Confidentialité et conditions</a></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ===== Configuration Supabase =====
@@ -54,10 +59,31 @@ const ERR = { 'Invalid login credentials': 'E-mail ou mot de passe incorrect.', 
 const tr = m => ERR[m] || m;
 const STAT = { en_attente: ['En attente de validation', '#b8892f'], valide: ['Validé', '#2e7d4f'], refuse: ['Refusé', '#c0392b'] };
 const tag = s => `<span class="tag" style="background:${(STAT[s] || STAT.en_attente)[1]}">${(STAT[s] || STAT.en_attente)[0]}</span>`;
-const SECT = ['Tabou', 'Grand-Béréby', 'San-Pédro', 'Sassandra', 'Fresco', 'Grand-Lahou', 'Jacqueville', 'Abidjan', 'Grand-Bassam', 'Bonoua', 'Assinie', 'Adiaké'];
-let user = null, prof = null, isAdm = false, recovery = RECOVERY_URL, linkErrShown = false;
+const SEC = [['tabou', 'Tabou', 4.42, -7.36], ['grand-bereby', 'Grand-Béréby', 4.65, -6.92], ['san-pedro', 'San-Pédro', 4.75, -6.64], ['sassandra', 'Sassandra', 4.95, -6.09], ['fresco', 'Fresco', 5.08, -5.57], ['grand-lahou', 'Grand-Lahou', 5.14, -5.02], ['jacqueville', 'Jacqueville', 5.20, -4.42], ['abidjan', 'Abidjan', 5.28, -3.97], ['grand-bassam', 'Grand-Bassam', 5.20, -3.74], ['bonoua', 'Bonoua', 5.27, -3.59], ['assinie', 'Assinie', 5.14, -3.29], ['adiake', 'Adiaké', 5.29, -3.30]].map(([id, nom, lat, lon]) => ({ id, nom, lat, lon }));
+const nomS = id => SEC.find(s => s.id === id)?.nom ?? id;
+const rad = x => x * Math.PI / 180;
+const dkm = (a, b) => { const h = Math.sin(rad(b[0] - a[0]) / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(rad(b[1] - a[1]) / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+const parseG = t => { const m = String(t || '').match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/); return m ? [+m[1], +m[2]] : null; };
+const fr = n => n == null ? '—' : n.toFixed(1).replace('.', ',');
+const url = async p => (await sb.storage.from('photos').createSignedUrl(p, 3600)).data?.signedUrl;
+const shrink = f => new Promise(r => { const i = new Image(); i.onload = () => { const k = Math.min(1, 1600 / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = i.width * k; c.height = i.height * k; c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); c.toBlob(b => r(b || f), 'image/jpeg', .82); }; i.onerror = () => r(f); i.src = URL.createObjectURL(f); });
+function trend(rows) {
+  const P = rows.filter(o => o.distance_m != null).map(o => [Date.parse(o.observed_on) / 31557600000, +o.distance_m]);
+  if (P.length < 3) return null;
+  const n = P.length, mx = P.reduce((a, p) => a + p[0], 0) / n, my = P.reduce((a, p) => a + p[1], 0) / n, sx = P.reduce((a, p) => a + (p[0] - mx) ** 2, 0);
+  if (sx < .01) return null;
+  const b = P.reduce((a, p) => a + (p[0] - mx) * (p[1] - my), 0) / sx, se = Math.sqrt(P.reduce((a, p) => a + (p[1] - my - b * (p[0] - mx)) ** 2, 0) / (n - 2) / sx);
+  return { b, se, n };
+}
+const OS = { en_revue: ['En revue', '#b8892f'], validee: ['Publiée', '#2e7d4f'], rejetee: ['Rejetée', '#c0392b'] };
+const obsRow = (o, extra = '') => `<div class="row" style="align-items:flex-start"><div><b>${esc(nomS(o.sector_id))}</b> · ${esc(o.observed_on)} · ${esc(o.type)}<br>${esc(o.description || o.repere)}<br><span class="note">Repère : ${esc(o.repere)} · ${esc(o.outil || '')}${o.direction ? ' · Direction : ' + esc(o.direction) : ''}${o.maree ? ' · Marée : ' + esc(o.maree) : ''}${o.fiabilite ? ' · Fiabilité : ' + esc(o.fiabilite) : ''}${o.auteur ? ' · Auteur : ' + esc(o.auteur) : ''}</span>${extra}</div><span class="tag" style="background:${OS[o.statut][1]}">${OS[o.statut][0]}</span></div>`;
+const alerteConfig = () => CONFIG_OK ? '' : '<p class="msg ko">Configuration : collez votre clé publiable Supabase dans la constante SUPABASE_KEY de index.html.</p>';
 
-/* ===== Session ===== */
+/* ===== Session et grade ===== */
+let user = null, prof = null, isAdm = false, recovery = RECOVERY_URL, linkErrShown = false;
+const ok = () => prof?.statut === 'valide';
+const isR = () => ok() && (prof.type_compte === 'chercheur' || isAdm);
+const grade = () => isAdm ? 'Administrateur' : prof?.type_compte === 'chercheur' ? 'Chercheur' : 'Utilisateur';
 async function load() {
   if (!sb) { nav(); route(); return; }
   const { data: { session } } = await sb.auth.getSession();
@@ -70,74 +96,79 @@ async function load() {
 }
 function nav() {
   const L = [['accueil', 'Accueil']];
+  if (ok()) L.push(['contribuer', 'Contribuer']);
+  if (isR()) L.push(['tableau', 'Tableau de bord']);
+  L.push(['protocole', 'Protocole'], ['premium', '✦ Premium']);
   if (!user) L.push(['connexion', 'Connexion'], ['inscription', 'Créer un compte']);
-  else { L.push(['compte', 'Mon compte']); if (isAdm) L.push(['admin', 'Administration']); }
-  const cur = location.hash.slice(1) || 'accueil';
+  else { L.push(['compte', 'Mon compte']); if (isAdm) L.push(['admin', 'Inscriptions']); }
+  const cur = (location.hash.slice(1) || 'accueil').split('/')[0];
   $('#nav').innerHTML = L.map(([h, t]) => `<a href="#${h}"${cur === h ? ' class="on"' : ''}>${t}</a>`).join('') + (user ? '<button id="out" class="btn ghost" type="button">Déconnexion</button>' : '');
   $('#out')?.addEventListener('click', async () => { await sb.auth.signOut(); go('#accueil'); });
 }
 
-/* ===== Pages ===== */
-const alerteConfig = () => CONFIG_OK ? '' : '<p class="msg ko">Configuration : collez votre clé publiable Supabase dans la constante SUPABASE_KEY de index.html.</p>';
-
-function accueil() {
-  app.innerHTML = `<div class="hero"><h1>Chaque mètre de côte perdu mérite d’être mesuré.</h1><p>EroTrack réunit chercheurs, étudiants et citoyens pour suivre le recul du trait de côte en Côte d’Ivoire.</p>${user ? '<a class="btn gold" href="#compte">Mon compte</a>' : '<a class="btn gold" href="#inscription">Créer un compte</a> <a class="btn ghost" href="#connexion">Se connecter</a>'}</div>${alerteConfig()}<section><h2>Douze secteurs, un même littoral</h2><div class="grid">${SECT.map(s => `<div class="card"><h3>${s}</h3></div>`).join('')}</div></section>`;
+/* ===== Pages publiques ===== */
+async function accueil() {
+  const c = {};
+  if (sb) ((await sb.from('observations').select('sector_id').eq('statut', 'validee')).data ?? []).forEach(o => c[o.sector_id] = (c[o.sector_id] || 0) + 1);
+  const bienvenue = ok() ? `<div class="card" style="margin-top:18px"><h3>Bienvenue ${esc(prof.nom)}</h3><p>${grade()} · ${tag('valide')}</p><p><a class="btn" href="#contribuer">Envoyer une observation</a> ${isR() ? '<a class="btn" href="#tableau">Tableau de bord</a>' : ''} <a class="btn gold" href="#compte">Mon compte</a></p></div>` : user && prof ? `<div class="card" style="margin-top:18px"><p>${tag(prof.statut)} Votre inscription n’est pas encore validée. <a href="#compte">Voir mon compte</a></p></div>` : '';
+  app.innerHTML = `<div class="hero"><h1>Chaque mètre de côte perdu mérite d’être mesuré.</h1><p>EroTrack réunit chercheurs, étudiants et citoyens pour suivre le recul du trait de côte en Côte d’Ivoire.</p>${user ? '' : '<a class="btn gold" href="#inscription">Créer un compte</a> <a class="btn ghost" href="#connexion">Se connecter</a>'}</div>${alerteConfig()}${bienvenue}<section><h2>Douze secteurs, un même littoral</h2><div class="grid">${SEC.map(s => `<a class="card" href="#secteur/${s.id}" style="text-decoration:none;color:inherit"><h3>${esc(s.nom)}</h3><span class="note">${c[s.id] || 0} observation(s) validée(s)</span></a>`).join('')}</div></section>`;
 }
 
+async function secteur(id) {
+  const { data } = await sb.from('observations').select('*, photos(storage_path)').eq('sector_id', id).eq('statut', 'validee').order('observed_on');
+  const rows = data ?? [], t = trend(rows), C = [];
+  rows.filter(o => o.photos?.length && o.lat != null).map(o => ({ o, g: [+o.lat, +o.lon] })).forEach(x => { const c = C.find(c => dkm(c[0].g, x.g) < .025); c ? c.push(x) : C.push([x]); });
+  const P = C.filter(c => c.length > 1 && c[0].o.observed_on !== c[c.length - 1].o.observed_on);
+  const cmp = (await Promise.all(P.map(async c => {
+    const a = c[0].o, b = c[c.length - 1].o;
+    return `<h3>${esc(a.repere)}</h3><div class="cmp"><img src="${await url(a.photos[0].storage_path)}" alt="Photo du ${esc(a.observed_on)}"><img class="b" src="${await url(b.photos[0].storage_path)}" alt="Photo du ${esc(b.observed_on)}"><span class="lb" style="left:10px">${esc(a.observed_on)}</span><span class="lb" style="right:10px">${esc(b.observed_on)}</span><input type="range" min="0" max="100" value="50" aria-label="Comparateur avant/après"></div><p class="note">${c.length} photos à moins de 25 m, rapprochées par leurs coordonnées GPS.</p>`;
+  }))).join('');
+  app.innerHTML = `<section><a href="#accueil">← Accueil</a><h1>${esc(nomS(id))}</h1><p>Taux annuel : <b>${t ? fr(t.b) + ' ± ' + fr(1.96 * t.se) + ' m/an' : '—'}</b> <span class="note">${t ? t.n + ' mesures validées' : '3 mesures validées minimum, à des dates différentes'}</span></p><h2>Comparaison avant / après</h2>${cmp || '<p>Aucune paire de photos : il faut deux observations validées avec photos, à des dates différentes, à moins de 25 m.</p>'}<h2>Observations validées</h2>${rows.map(o => obsRow(o)).join('') || '<p>Aucune observation validée.</p>'}</section>`;
+  app.querySelectorAll('.cmp input').forEach(i => i.oninput = () => i.parentNode.style.setProperty('--p', i.value + '%'));
+}
+
+function protocole() {
+  const C = [['1. Choisir un repère fixe', 'Un mur, un poteau, une borne ou un arbre qui ne bouge pas. Photographiez-le de loin pour pouvoir le retrouver, et décrivez-le.'], ['2. Mesurer la distance', 'Du repère au haut de plage (limite de la végétation ou pied de la dune), en ligne droite, perpendiculairement au rivage. Mètre ruban si possible : indiquez l’outil utilisé.'], ['3. Toujours le même point', 'Revenez au même endroit, avec la même direction de prise de vue. Notez la direction et le niveau de marée : la ligne d’eau en dépend.'], ['4. Photographier', 'Deux à trois photos : vue d’ensemble depuis le repère, vue de la berge, détail. Évitez les personnes. Activez la localisation avant de prendre la photo.'], ['5. Quand mesurer', 'Plusieurs fois par an, à la même saison pour comparer, et après un événement fort : forte houle, effondrement, submersion.'], ['6. Ensuite', 'Un chercheur contrôle la cohérence, valide ou rejette, et donne un niveau de fiabilité. Seules les observations validées sont publiques.']];
+  app.innerHTML = `<section><h1>Protocole de mesure</h1><p class="msg ok" style="background:#fbf0d5;color:#5a4410"><b>Proposition de départ.</b> À faire relire et valider par des chercheurs avant de l’imposer aux contributeurs.</p><div class="grid">${C.map(c => `<div class="card"><h3>${c[0]}</h3><p>${c[1]}</p></div>`).join('')}</div></section>`;
+}
+function confidentialite() {
+  const C = [['Données collectées', 'Votre compte, votre nom ou pseudonyme, votre profil, vos observations (date, position GPS, mesures, description), vos photos et vos préinscriptions.'], ['Pourquoi', 'Suivre l’érosion du littoral, valider les mesures et publier des résultats pour la recherche et la décision publique.'], ['Ce qui est public', 'Les observations validées et leurs photos, avec le nom ou le pseudonyme que vous avez choisi. Vos observations en attente ne sont visibles que par vous et les chercheurs.'], ['Vos droits', 'Accéder à vos données, les corriger ou demander leur suppression. Contact : à définir.'], ['Conservation', 'Durée de conservation : à définir.'], ['Licence des données ouvertes', 'À définir (par exemple CC BY 4.0).']];
+  app.innerHTML = `<section><h1>Confidentialité et conditions</h1><p class="msg ok" style="background:#fbf0d5;color:#5a4410"><b>Texte modèle.</b> À faire valider par un juriste et à adapter à la loi ivoirienne sur la protection des données personnelles.</p><div class="grid">${C.map(c => `<div class="card"><h3>${c[0]}</h3><p>${c[1]}</p></div>`).join('')}</div></section>`;
+}
+const FT = [['🛰️', 'Imagerie satellite', 'Détection du trait de côte sur les images Sentinel-2 et Landsat.'], ['🔔', 'Alertes automatiques', 'Un message quand un secteur s’accélère ou qu’un effondrement est signalé.'], ['📱', 'Application mobile', 'Contribuer depuis la plage, même sans connexion.'], ['🔓', 'Données ouvertes (API)', 'Export CSV et accès par API.'], ['📈', 'Prévisions du recul', 'Projections à 10 ou 20 ans pour anticiper les zones à risque.'], ['📄', 'Rapports pour décideurs', 'Fiches PDF par secteur.'], ['🤖', 'Analyse des photos par IA', 'L’IA propose, le chercheur décide.']];
+async function premium() {
+  const mine = ok() ? new Set(((await sb.from('user_interests').select('feature').eq('user_id', user.id)).data ?? []).map(x => x.feature)) : new Set();
+  app.innerHTML = `<section><h1>✦ Espace Premium</h1><p>Les fonctionnalités à venir. Aucun paiement n’est demandé : indiquez celles qui vous intéressent.</p><div class="grid">${FT.map(([ic, t, d]) => `<div class="card"><div style="font-size:2rem">${ic}</div><h3>${t}</h3><p>${d}</p><span class="tag" style="background:var(--mut)">Bientôt disponible</span>${ok() ? `<p><button class="btn" data-k="${t}">${mine.has(t) ? '✓ Vous serez prévenu(e)' : 'M’informer, gratuit'}</button></p>` : '<p class="note">Réservé aux membres validés.</p>'}</div>`).join('')}</div></section>`;
+  app.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
+    const k = b.dataset.k;
+    mine.has(k) ? await sb.from('user_interests').delete().eq('user_id', user.id).eq('feature', k) : await sb.from('user_interests').insert({ user_id: user.id, feature: k });
+    premium();
+  });
+}
+
+/* ===== Compte : connexion, inscription, mot de passe ===== */
 function connexion() {
-  if (user) return go('#compte');
+  if (user) return go(ok() ? '#accueil' : '#compte');
   app.innerHTML = `<section><h1>Connexion</h1>${alerteConfig()}<form class="card" id="f"><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><label for="p">Mot de passe</label><input id="p" type="password" autocomplete="current-password" required><p style="margin:6px 0 0"><a href="#mot-de-passe-oublie">Mot de passe oublié ?</a></p><p><button class="btn" type="submit">Se connecter</button></p><div id="m"></div><p class="note">Pas encore de compte ? <a href="#inscription">Créer un compte</a></p></form></section>`;
   $('#f').onsubmit = async e => {
     e.preventDefault(); if (!sb) return;
     const { error } = await sb.auth.signInWithPassword({ email: $('#e').value.trim(), password: $('#p').value });
     if (error) return msg($('#m'), tr(error.message));
-    go('#compte');
+    await load();   /* le grade est lu, puis la page officielle s'ouvre selon le statut */
   };
 }
-
 function inscription() {
-  if (user) return go('#compte');
-  app.innerHTML = `<section><h1>Créer un compte</h1>${alerteConfig()}<form class="card" id="f"><label for="n">Nom et prénom (ou pseudonyme)</label><input id="n" maxlength="100" required><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><label for="p">Mot de passe (8 caractères minimum)</label><input id="p" type="password" minlength="8" autocomplete="new-password" required><label for="t">Type de compte demandé</label><select id="t"><option value="utilisateur">Utilisateur (étudiant, élu, citoyen, pêcheur)</option><option value="chercheur">Chercheur</option></select><label for="i">Institution (facultatif)</label><input id="i" maxlength="150"><label class="chk"><input id="c" type="checkbox" required><span>Je comprends que mon inscription sera examinée par un administrateur avant d’être validée.</span></label><p><button class="btn" type="submit">Créer mon compte</button></p><div id="m"></div><p class="note">Déjà inscrit ? <a href="#connexion">Se connecter</a></p></form></section>`;
+  if (user) return go(ok() ? '#accueil' : '#compte');
+  app.innerHTML = `<section><h1>Créer un compte</h1>${alerteConfig()}<form class="card" id="f"><label for="n">Nom et prénom (ou pseudonyme)</label><input id="n" maxlength="100" required><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><label for="p">Mot de passe (8 caractères minimum)</label><input id="p" type="password" minlength="8" autocomplete="new-password" required><label for="t">Grade demandé</label><select id="t"><option value="utilisateur">Utilisateur (étudiant, élu, citoyen, pêcheur)</option><option value="chercheur">Chercheur</option></select><label for="i">Institution (facultatif)</label><input id="i" maxlength="150"><label class="chk"><input id="c" type="checkbox" required><span>Je comprends que mon inscription et mon grade seront examinés par un administrateur avant d’être validés.</span></label><p><button class="btn" type="submit">Créer mon compte</button></p><div id="m"></div><p class="note">Déjà inscrit ? <a href="#connexion">Se connecter</a></p></form></section>`;
   $('#f').onsubmit = async e => {
     e.preventDefault(); if (!sb) return;
-    const { data, error } = await sb.auth.signUp({
-      email: $('#e').value.trim(), password: $('#p').value,
-      options: { data: { nom: $('#n').value.trim(), type_compte: $('#t').value, institution: $('#i').value.trim() }, emailRedirectTo: location.origin + location.pathname }
-    });
+    const { data, error } = await sb.auth.signUp({ email: $('#e').value.trim(), password: $('#p').value, options: { data: { nom: $('#n').value.trim(), type_compte: $('#t').value, institution: $('#i').value.trim() }, emailRedirectTo: location.origin + location.pathname } });
     if (error) return msg($('#m'), tr(error.message));
     $('#f').querySelector('button').disabled = true;
-    if (data.session) { msg($('#m'), 'Compte créé. Votre inscription est en attente de validation par un administrateur.', true); setTimeout(() => go('#compte'), 1200); }
+    if (data.session) { msg($('#m'), 'Compte créé. Votre inscription est en attente de validation par un administrateur.', true); setTimeout(() => load().then(() => go('#compte')), 1200); }
     else msg($('#m'), 'Compte créé : confirmez votre adresse via le lien reçu par e-mail, puis connectez-vous. Votre inscription sera ensuite examinée par un administrateur.', true);
   };
 }
-
-function compte() {
-  if (!user) return go('#connexion');
-  if (!prof) { app.innerHTML = '<section><h1>Mon compte</h1><p>Votre profil est en cours de création. Rechargez la page dans un instant.</p></section>'; return; }
-  const ok = prof.statut === 'valide';
-  app.innerHTML = `<section><h1>Mon compte</h1><p>${tag(prof.statut)} <span class="note">Compte ${esc(prof.type_compte)}</span></p>${ok ? '<div class="card"><h3>Accès membre activé</h3><p>Votre inscription a été validée. Les fonctions réservées aux membres s’afficheront ici.</p></div>' : prof.statut === 'refuse' ? '<p class="msg ko">Votre inscription a été refusée. Contactez l’équipe d’EroTrack pour en savoir plus.</p>' : '<p class="msg ok" style="background:#fbf0d5;color:#5a4410">Votre inscription est en attente de validation par un administrateur.</p>'}<h2 style="margin-top:28px">Mes informations</h2><form class="card" id="f"><label>E-mail</label><input value="${esc(prof.email)}" disabled><label for="n">Nom</label><input id="n" maxlength="100" value="${esc(prof.nom)}" required><label for="i">Institution</label><input id="i" maxlength="150" value="${esc(prof.institution)}"><p><button class="btn" type="submit">Enregistrer</button></p><div id="m"></div></form></section>`;
-  $('#f').onsubmit = async e => {
-    e.preventDefault();
-    const { error } = await sb.from('profiles').update({ nom: $('#n').value.trim(), institution: $('#i').value.trim() || null }).eq('id', user.id);
-    if (error) return msg($('#m'), error.message);
-    prof.nom = $('#n').value.trim(); msg($('#m'), 'Informations enregistrées.', true);
-  };
-}
-
-async function admin() {
-  if (!user) return go('#connexion');
-  if (!isAdm) { app.innerHTML = '<section><h1>Administration</h1><p>Cet espace est réservé aux administrateurs.</p></section>'; return; }
-  const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
-  if (error) { app.innerHTML = `<section><h1>Administration</h1><p class="msg ko">${esc(error.message)}</p></section>`; return; }
-  const P = (data ?? []).sort((a, b) => (a.statut === 'en_attente' ? 0 : 1) - (b.statut === 'en_attente' ? 0 : 1));
-  const att = P.filter(p => p.statut === 'en_attente').length;
-  app.innerHTML = `<section><h1>Administration</h1><p>${att} inscription(s) en attente sur ${P.length}.</p><div class="card">${P.map(p => `<div class="row"><div><b>${esc(p.nom)}</b> ${tag(p.statut)}<br><span class="note">${esc(p.email)} · ${esc(p.type_compte)}${p.institution ? ' · ' + esc(p.institution) : ''} · ${new Date(p.created_at).toLocaleDateString('fr-FR')}</span></div><div>${p.statut !== 'valide' ? `<button class="btn sm" data-id="${esc(p.id)}" data-s="valide">Valider</button> ` : ''}${p.statut !== 'refuse' ? `<button class="btn sm red" data-id="${esc(p.id)}" data-s="refuse">Refuser</button>` : ''}</div></div>`).join('') || '<p>Aucune inscription.</p>'}</div></section>`;
-  app.querySelectorAll('[data-id]').forEach(b => b.onclick = async () => {
-    const { error } = await sb.rpc('valider_profil', { p_id: b.dataset.id, p_statut: b.dataset.s });
-    error ? alert(error.message) : admin();
-  });
-}
-
 function oublie() {
   if (user && !recovery) return go('#compte');
   app.innerHTML = `<section><h1>Mot de passe oublié</h1>${alerteConfig()}${LINK_ERR ? '<p class="msg ko">Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau ci-dessous.</p>' : ''}<form class="card" id="f"><p>Saisissez l’adresse e-mail de votre compte : nous vous enverrons un lien pour choisir un nouveau mot de passe.</p><label for="e">E-mail</label><input id="e" type="email" autocomplete="email" required><p><button class="btn" type="submit">Envoyer le lien</button></p><div id="m"></div><p class="note"><a href="#connexion">← Retour à la connexion</a></p></form></section>`;
@@ -154,7 +185,6 @@ function oublie() {
     setTimeout(() => b.disabled = false, 60000);
   };
 }
-
 function reinitialiser() {
   if (!recovery) return go('#mot-de-passe-oublie');
   app.innerHTML = `<section><h1>Nouveau mot de passe</h1><form class="card" id="f"><label for="p1">Nouveau mot de passe (8 caractères minimum)</label><input id="p1" type="password" minlength="8" autocomplete="new-password" required><label for="p2">Confirmer le mot de passe</label><input id="p2" type="password" minlength="8" autocomplete="new-password" required><p><button class="btn" type="submit">Enregistrer le mot de passe</button></p><div id="m"></div></form></section>`;
@@ -169,14 +199,93 @@ function reinitialiser() {
   };
 }
 
-const PAGES = { accueil, connexion, inscription, compte, admin, 'mot-de-passe-oublie': oublie, reinitialiser };
+async function compte() {
+  if (!user) return go('#connexion');
+  if (!prof) { app.innerHTML = '<section><h1>Mon compte</h1><p>Votre profil est en cours de création. Rechargez la page dans un instant.</p></section>'; return; }
+  let extra = '';
+  if (ok()) {
+    const { data: O } = await sb.from('observations').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    const { data: v } = await sb.from('user_validity').select('*').eq('user_id', user.id).maybeSingle();
+    extra = `<h2 style="margin-top:28px">Mes contributions</h2><p>Contributions : <b>${O?.length ?? 0}</b> · Taux de validité : <b>${v?.taux_validite == null ? '—' : v.taux_validite + ' %'}</b></p>${(O ?? []).map(o => obsRow(o)).join('') || '<p>Aucune contribution pour le moment.</p>'}`;
+  }
+  const etat = ok() ? `<div class="card"><h3>Accès membre activé : ${grade()}</h3><p><a class="btn" href="#contribuer">Envoyer une observation</a> ${isR() ? '<a class="btn" href="#tableau">Tableau de bord</a>' : ''} <a class="btn gold" href="#accueil">Page d’accueil</a></p></div>` : prof.statut === 'refuse' ? '<p class="msg ko">Votre inscription a été refusée. Contactez l’équipe d’EroTrack pour en savoir plus.</p>' : '<p class="msg ok" style="background:#fbf0d5;color:#5a4410">Votre inscription est en attente de validation par un administrateur. Rechargez la page après sa validation.</p>';
+  app.innerHTML = `<section><h1>Mon compte</h1><p>${tag(prof.statut)} <span class="note">Grade demandé : ${esc(prof.type_compte)}</span></p>${etat}<h2 style="margin-top:28px">Mes informations</h2><form class="card" id="f"><label>E-mail</label><input value="${esc(prof.email)}" disabled><label for="n">Nom</label><input id="n" maxlength="100" value="${esc(prof.nom)}" required><label for="i">Institution</label><input id="i" maxlength="150" value="${esc(prof.institution)}"><p><button class="btn" type="submit">Enregistrer</button></p><div id="m"></div></form>${extra}</section>`;
+  $('#f').onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.from('profiles').update({ nom: $('#n').value.trim(), institution: $('#i').value.trim() || null }).eq('id', user.id);
+    if (error) return msg($('#m'), error.message);
+    prof.nom = $('#n').value.trim(); msg($('#m'), 'Informations enregistrées.', true);
+  };
+}
+
+/* ===== Espace membres ===== */
+function contribuer() {
+  if (!user) return go('#connexion');
+  if (!ok()) return go('#compte');
+  app.innerHTML = `<section><h1>Contribuer</h1><form class="card wide" id="f"><label>Secteur<select name="secteur" required>${SEC.map(s => `<option value="${s.id}">${esc(s.nom)}</option>`).join('')}</select></label><div class="two"><label>Date<input name="date" type="date" required></label><label>Heure<input name="heure" type="time"></label></div><label>Type d’observation<select name="type"><option>Recul du trait de côte</option><option>Effondrement de dune</option><option>Submersion</option><option>Ouvrage de protection</option></select></label><label>Repère fixe (poteau, mur, arbre)<input name="repere" maxlength="200" required placeholder="Poteau devant l’hôtel"></label><div class="two"><label>Distance mesurée (m)<input name="dist" type="number" step="0.1" min="0"></label><label>Outil de mesure<select name="outil"><option>Mètre ruban</option><option>GPS</option><option>Estimation</option></select></label></div><div class="two"><label>Direction de prise de vue<select name="direction"><option value="">Non précisée</option><option>Nord</option><option>Nord-Est</option><option>Est</option><option>Sud-Est</option><option>Sud</option><option>Sud-Ouest</option><option>Ouest</option><option>Nord-Ouest</option></select></label><label>Niveau de marée<select name="maree"><option value="">Non précisé</option><option>Basse</option><option>Montante</option><option>Haute</option><option>Descendante</option></select></label></div><label>Coordonnées GPS<input name="gps" placeholder="5.1984, -3.7366"></label><p><button type="button" class="btn" id="loc" style="background:var(--mut)">Ma position</button></p><label>Photos (3 maximum, évitez d’y faire figurer des personnes)<input name="photos" type="file" accept="image/*" multiple></label><label>Description<textarea name="desc" rows="3" maxlength="1000"></textarea></label><label class="chk"><input type="checkbox" name="consent" required><span>J’accepte que mon observation soit publiée après validation par un chercheur et utilisée pour la recherche. Je n’ai pas photographié de personnes reconnaissables. <a href="#confidentialite">Confidentialité</a></span></label><p><button class="btn" type="submit">Envoyer l’observation</button></p><div id="m"></div></form></section>`;
+  const f = $('#f'), m = $('#m');
+  $('#loc').onclick = () => navigator.geolocation?.getCurrentPosition(p => { f.gps.value = p.coords.latitude.toFixed(5) + ', ' + p.coords.longitude.toFixed(5); const g = [p.coords.latitude, p.coords.longitude], n = SEC.map(s => [s.id, dkm(g, [s.lat, s.lon])]).sort((a, b) => a[1] - b[1])[0]; f.secteur.value = n[0]; });
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(f)), g = parseG(d.gps), s = SEC.find(x => x.id === d.secteur), flags = [], sb2 = f.querySelector('[type=submit]');
+    sb2.disabled = true;
+    if (d.date > new Date().toISOString().slice(0, 10)) flags.push('Date dans le futur');
+    if (!g) flags.push('GPS absent ou illisible'); else if (dkm(g, [s.lat, s.lon]) > 40) flags.push('Position à plus de 40 km du secteur');
+    if (+d.dist > 30) flags.push('Distance inhabituelle (plus de 30 m)');
+    const { data: o, error } = await sb.from('observations').insert({ sector_id: d.secteur, user_id: user.id, observed_on: d.date, observed_at: d.heure || null, type: d.type, repere: d.repere, distance_m: d.dist || null, outil: d.outil, direction: d.direction || null, maree: d.maree || null, lat: g?.[0] ?? null, lon: g?.[1] ?? null, description: d.desc || null, flags }).select('id').single();
+    if (error) { sb2.disabled = false; return msg(m, error.message); }
+    for (const [i, file] of [...f.photos.files].slice(0, 3).entries()) {
+      const path = `${user.id}/${o.id}/${i}.jpg`;
+      const up = await sb.storage.from('photos').upload(path, await shrink(file), { contentType: 'image/jpeg' });
+      if (!up.error) await sb.from('photos').insert({ observation_id: o.id, storage_path: path });
+    }
+    f.reset(); sb2.disabled = false; msg(m, 'Observation envoyée : elle sera publiée après validation par un chercheur. Retrouvez-la dans « Mon compte ».', true);
+  };
+}
+
+async function tableau() {
+  if (!user) return go('#connexion');
+  if (!isR()) { app.innerHTML = '<section><h1>Tableau de bord</h1><p>Cet espace est réservé aux chercheurs validés.</p></section>'; return; }
+  const { data: P } = await sb.from('observations').select('*, photos(storage_path)').eq('statut', 'en_revue').order('created_at');
+  const { data: V } = await sb.from('user_validity').select('*');
+  const pend = await Promise.all((P ?? []).map(async o => {
+    const imgs = (await Promise.all((o.photos ?? []).map(p => url(p.storage_path)))).map(u => `<img src="${u}" alt="Photo" style="max-width:160px;border-radius:8px;margin:4px 4px 0 0">`).join('');
+    const own = o.user_id === user.id;
+    return obsRow(o, `${o.flags?.length ? `<br><b style="color:#c0392b">⚠ À vérifier : ${esc(o.flags.join(' ; '))}</b>` : ''}<br>${imgs}<p>${own ? '<span class="note">Vous ne pouvez pas valider votre propre observation.</span>' : `<select data-f="${o.id}" style="width:auto"><option>Haute</option><option>Moyenne</option><option>Faible</option></select> <button class="btn sm" data-a="validee" data-id="${o.id}">Valider</button> <button class="btn sm red" data-a="rejetee" data-id="${o.id}">Rejeter</button>`}</p>`);
+  }));
+  app.innerHTML = `<section><h1>Tableau de bord chercheur</h1><h2>Observations à valider (${pend.length})</h2>${pend.join('') || '<p>Aucune observation en attente.</p>'}<h2 style="margin-top:28px">Contributeurs et taux de validité</h2><div class="card"><table><tr><th>Contributeur</th><th>Validées</th><th>Rejetées</th><th>En attente</th><th>Taux</th></tr>${(V ?? []).map(v => `<tr><td>${esc(v.auteur)}</td><td>${v.validees}</td><td>${v.rejetees}</td><td>${v.en_attente}</td><td><b>${v.taux_validite == null ? '—' : v.taux_validite + ' %'}</b></td></tr>`).join('')}</table></div><p class="note">Taux = validées ÷ (validées + rejetées).</p></section>`;
+  app.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const fiab = app.querySelector(`[data-f="${b.dataset.id}"]`).value, val = b.dataset.a === 'validee';
+    const { error } = await sb.from('observations').update({ statut: b.dataset.a, fiabilite: val ? fiab : null, validee_par: user.id, decided_at: new Date().toISOString() }).eq('id', b.dataset.id);
+    error ? alert(error.message) : tableau();
+  });
+}
+
+async function admin() {
+  if (!user) return go('#connexion');
+  if (!isAdm) { app.innerHTML = '<section><h1>Inscriptions</h1><p>Cet espace est réservé aux administrateurs.</p></section>'; return; }
+  const { data, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) { app.innerHTML = `<section><h1>Inscriptions</h1><p class="msg ko">${esc(error.message)}</p></section>`; return; }
+  const P = (data ?? []).sort((a, b) => (a.statut === 'en_attente' ? 0 : 1) - (b.statut === 'en_attente' ? 0 : 1));
+  app.innerHTML = `<section><h1>Inscriptions</h1><p>${P.filter(p => p.statut === 'en_attente').length} en attente sur ${P.length}. Valider un compte lui donne le grade demandé.</p><div class="card">${P.map(p => `<div class="row"><div><b>${esc(p.nom)}</b> ${tag(p.statut)}<br><span class="note">${esc(p.email)} · grade demandé : ${esc(p.type_compte)}${p.institution ? ' · ' + esc(p.institution) : ''} · ${new Date(p.created_at).toLocaleDateString('fr-FR')}</span></div><div>${p.statut !== 'valide' ? `<button class="btn sm" data-id="${esc(p.id)}" data-s="valide">Valider</button> ` : ''}${p.statut !== 'refuse' ? `<button class="btn sm red" data-id="${esc(p.id)}" data-s="refuse">Refuser</button>` : ''}</div></div>`).join('') || '<p>Aucune inscription.</p>'}</div></section>`;
+  app.querySelectorAll('[data-id]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.rpc('valider_profil', { p_id: b.dataset.id, p_statut: b.dataset.s });
+    error ? alert(error.message) : admin();
+  });
+}
+
+/* ===== Routage ===== */
+const PAGES = { accueil, secteur, protocole, confidentialite, premium, connexion, inscription, 'mot-de-passe-oublie': oublie, reinitialiser, compte, contribuer, tableau, admin };
 async function route() {
   if (recovery && location.hash.slice(1) !== 'reinitialiser') return go('#reinitialiser');
   if (LINK_ERR && !linkErrShown) { linkErrShown = true; return go('#mot-de-passe-oublie'); }
+  $('#nav').classList.remove('open'); $('#mb').setAttribute('aria-expanded', 'false');
   nav();
-  await (PAGES[location.hash.slice(1)] ?? accueil)();
+  const [p, arg] = (location.hash.slice(1) || 'accueil').split('/');
+  await (PAGES[p] ?? accueil)(arg);
   window.scrollTo(0, 0);
 }
+$('#mb').onclick = () => { const o = $('#nav').classList.toggle('open'); $('#mb').setAttribute('aria-expanded', o); };
 addEventListener('hashchange', route);
 if (sb) sb.auth.onAuthStateChange(ev => {
   if (ev === 'PASSWORD_RECOVERY') { recovery = true; setTimeout(() => { load(); go('#reinitialiser'); }, 0); return; }
