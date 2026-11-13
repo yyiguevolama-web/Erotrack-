@@ -1,6 +1,5 @@
 // Remplacer uniquement par les informations publiques de TON nouveau projet Supabase.
-export const SUPABASE_URL = "https://TON-PROJET.supabase.co";
-export const SUPABASE_ANON_KEY = "COLLER_ICI_LA_CLE_PUBLISHABLE_OU_ANON";
+export const SUPABASE_ANON_KEY = "sb_publishable_rVaeSfhXt4uvyhBzEF9psA_FOiBZ_jF";
 export const PHOTO_BUCKET = "observation-photos";
 export const isConfigured = () =>
   SUPABASE_URL.startsWith("https://") &&
